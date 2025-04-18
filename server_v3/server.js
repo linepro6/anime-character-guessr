@@ -271,21 +271,15 @@ io.on('connection', (socket) => {
 
     // Store guess in the player's guesses array using their username
     if (room.currentGame) {
-      // const playerGuesses = room.currentGame.guesses.find(g => g.username === player.username);
-      // if (playerGuesses) {
-      //   playerGuesses.guesses.push({
-      //     playerId: socket.id,
-      //     playerName: player.username,
-      //     ...guessResult,
-      //     timestamp: Date.now()
-      //   });
-      // }
-      room.currentGame.guesses.push({
-        playerId: socket.id,
-        playerName: player.username,
-        ...guessResult,
-        timestamp: Date.now()
-      });
+      const playerGuesses = room.currentGame.guesses.find(g => g.username === player.username);
+      if (playerGuesses) {
+        playerGuesses.guesses.push({
+          playerId: socket.id,
+          playerName: player.username,
+          ...guessResult,
+          timestamp: Date.now()
+        });
+      }
     }
 
     console.log(`Player ${player.username} guessed in room ${roomId}: ${guessResult.name} (${guessResult.isCorrect ? 'correct' : 'incorrect'})`);

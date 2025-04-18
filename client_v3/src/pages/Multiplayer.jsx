@@ -76,6 +76,8 @@ const Multiplayer = () => {
     const newSocket = io(SOCKET_URL);
     setSocket(newSocket);
 
+    let internalAnswerCharacter = null;
+
     // Socket event listeners
     newSocket.on('updatePlayers', ({ players, isPublic }) => {
       setPlayers(players);
@@ -104,6 +106,10 @@ const Multiplayer = () => {
     newSocket.on('gameStart', ({ character, settings, players, isPublic }) => {
       gameEndedRef.current = false;
       const decryptedCharacter = JSON.parse(CryptoJS.AES.decrypt(character, secret).toString(CryptoJS.enc.Utf8));
+
+      internalAnswerCharacter = decryptedCharacter;
+
+      console.log('Game started with character:', decryptedCharacter);
       setAnswerCharacter(decryptedCharacter);
       setGameSettings(settings);
       setGuessesLeft(settings.maxAttempts);
@@ -135,25 +141,6 @@ const Multiplayer = () => {
       setIsGameStarted(true);
       setGameEnd(false);
       setGuesses([]);
-
-      newSocket.on('updateGuess', ({ guessData }) => {
-
-        console.log('Received guess update:', guessData);
-    
-        const isCorrect = guessData.id === decryptedCharacter.id;
-    
-        if (isCorrect) {
-          setGuesses(prevGuesses => [...prevGuesses, guessData]);
-    
-          handleGameEnd(true);
-        } else if (guessesLeft <= 1) {
-          setGuesses(prevGuesses => [...prevGuesses, guessData]);
-    
-          handleGameEnd(false);
-        } else {
-          setGuesses(prevGuesses => [...prevGuesses, guessData]);
-        }
-      });
     });
 
     // Listen for game end event
@@ -170,6 +157,34 @@ const Multiplayer = () => {
         ...player,
         ready: player.isHost ? player.ready : false
       })));
+    });
+
+    newSocket.on('updateGuess', ({ guessData }) => {
+
+      console.log('Received guess update:', guessData);
+
+      setIsGuessing(true);
+      setShouldResetTimer(true);
+
+  
+      const isCorrect = guessData.id === internalAnswerCharacter.id;
+  
+      setGuessesLeft(prev => prev - 1);
+  
+      if (isCorrect) {
+        setGuesses(prevGuesses => [...prevGuesses, guessData]);
+  
+        handleGameEnd(true);
+      } else if (guessesLeft <= 1) {
+        setGuesses(prevGuesses => [...prevGuesses, guessData]);
+  
+        handleGameEnd(false);
+      } else {
+        setGuesses(prevGuesses => [...prevGuesses, guessData]);
+      }
+
+      setIsGuessing(false);
+      setShouldResetTimer(false);
     });
 
     return () => {
@@ -237,29 +252,30 @@ const Multiplayer = () => {
     setGameEnd(true);
 
     // Emit game end event to server
-    socket.emit('gameEnd', {
-      roomId,
-      result: isWin ? 'win' : 'lose'
-    });
+    // socket.emit('gameEnd', {
+    //   roomId,
+    //   result: isWin ? 'win' : 'lose'
+    // });
+
+    setGlobalGameEnd(true);
+    // setGuessesHistory(guesses);
+    setIsGameStarted(false);
 
     // Update player score
-    if (isWin) {
-      const updatedPlayers = players.map(p => {
-        if (p.id === socket.id) {
-          return { ...p, score: p.score + 1 };
-        }
-        return p;
-      });
-      setPlayers(updatedPlayers);
-      socket.emit('updateScore', { roomId, score: updatedPlayers.find(p => p.id === socket.id).score });
-    }
+    // if (isWin) {
+    //   const updatedPlayers = players.map(p => {
+    //     if (p.id === socket.id) {
+    //       return { ...p, score: p.score + 1 };
+    //     }
+    //     return p;
+    //   });
+    //   setPlayers(updatedPlayers);
+    //   socket.emit('updateScore', { roomId, score: updatedPlayers.find(p => p.id === socket.id).score });
+    // }
   };
 
   const handleCharacterSelect = async (character) => {
     if (isGuessing || !answerCharacter || gameEnd) return;
-
-    setIsGuessing(true);
-    setShouldResetTimer(true);
 
     try {
       const appearances = await getCharacterAppearances(character.id, gameSettings);
@@ -270,12 +286,12 @@ const Multiplayer = () => {
       };
 
       const isCorrect = guessData.id === answerCharacter.id;
-      setGuessesLeft(prev => prev - 1);
       // Send guess result to server
 
       const currentGuess = (() => {
         if (isCorrect) {
           return {
+            id: guessData.id,
             icon: guessData.image,
             name: guessData.name,
             nameCn: guessData.nameCn,
@@ -302,6 +318,7 @@ const Multiplayer = () => {
         } else if (guessesLeft <= 1) {
           const feedback = generateFeedback(guessData, answerCharacter);
           return {
+            id: guessData.id,
             icon: guessData.image,
             name: guessData.name,
             nameCn: guessData.nameCn,
@@ -325,6 +342,7 @@ const Multiplayer = () => {
         } else {
           const feedback = generateFeedback(guessData, answerCharacter);
           return {
+            id: guessData.id,
             icon: guessData.image,
             name: guessData.name,
             nameCn: guessData.nameCn,
@@ -361,9 +379,6 @@ const Multiplayer = () => {
     } catch (error) {
       console.error('Error processing guess:', error);
       alert('出错了，请重试');
-    } finally {
-      setIsGuessing(false);
-      setShouldResetTimer(false);
     }
   };
 
