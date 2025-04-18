@@ -135,6 +135,25 @@ const Multiplayer = () => {
       setIsGameStarted(true);
       setGameEnd(false);
       setGuesses([]);
+
+      newSocket.on('updateGuess', ({ guessData }) => {
+
+        console.log('Received guess update:', guessData);
+    
+        const isCorrect = guessData.id === decryptedCharacter.id;
+    
+        if (isCorrect) {
+          setGuesses(prevGuesses => [...prevGuesses, guessData]);
+    
+          handleGameEnd(true);
+        } else if (guessesLeft <= 1) {
+          setGuesses(prevGuesses => [...prevGuesses, guessData]);
+    
+          handleGameEnd(false);
+        } else {
+          setGuesses(prevGuesses => [...prevGuesses, guessData]);
+        }
+      });
     });
 
     // Listen for game end event
@@ -253,8 +272,85 @@ const Multiplayer = () => {
       const isCorrect = guessData.id === answerCharacter.id;
       setGuessesLeft(prev => prev - 1);
       // Send guess result to server
+
+      const currentGuess = (() => {
+        if (isCorrect) {
+          return {
+            icon: guessData.image,
+            name: guessData.name,
+            nameCn: guessData.nameCn,
+            gender: guessData.gender,
+            genderFeedback: 'yes',
+            latestAppearance: guessData.latestAppearance,
+            latestAppearanceFeedback: '=',
+            earliestAppearance: guessData.earliestAppearance,
+            earliestAppearanceFeedback: '=',
+            highestRating: guessData.highestRating,
+            ratingFeedback: '=',
+            appearancesCount: guessData.appearances.length,
+            appearancesCountFeedback: '=',
+            popularity: guessData.popularity,
+            popularityFeedback: '=',
+            sharedAppearances: {
+              first: appearances.appearances[0] || '',
+              count: appearances.appearances.length
+            },
+            metaTags: guessData.metaTags,
+            sharedMetaTags: guessData.metaTags,
+            isAnswer: true
+          };
+        } else if (guessesLeft <= 1) {
+          const feedback = generateFeedback(guessData, answerCharacter);
+          return {
+            icon: guessData.image,
+            name: guessData.name,
+            nameCn: guessData.nameCn,
+            gender: guessData.gender,
+            genderFeedback: feedback.gender.feedback,
+            latestAppearance: guessData.latestAppearance,
+            latestAppearanceFeedback: feedback.latestAppearance.feedback,
+            earliestAppearance: guessData.earliestAppearance,
+            earliestAppearanceFeedback: feedback.earliestAppearance.feedback,
+            highestRating: guessData.highestRating,
+            ratingFeedback: feedback.rating.feedback,
+            appearancesCount: guessData.appearances.length,
+            appearancesCountFeedback: feedback.appearancesCount.feedback,
+            popularity: guessData.popularity,
+            popularityFeedback: feedback.popularity.feedback,
+            sharedAppearances: feedback.shared_appearances,
+            metaTags: guessData.metaTags,
+            sharedMetaTags: feedback.metaTags.shared,
+            isAnswer: false
+          };
+        } else {
+          const feedback = generateFeedback(guessData, answerCharacter);
+          return {
+            icon: guessData.image,
+            name: guessData.name,
+            nameCn: guessData.nameCn,
+            gender: guessData.gender,
+            genderFeedback: feedback.gender.feedback,
+            latestAppearance: guessData.latestAppearance,
+            latestAppearanceFeedback: feedback.latestAppearance.feedback,
+            earliestAppearance: guessData.earliestAppearance,
+            earliestAppearanceFeedback: feedback.earliestAppearance.feedback,
+            highestRating: guessData.highestRating,
+            ratingFeedback: feedback.rating.feedback,
+            appearancesCount: guessData.appearances.length,
+            appearancesCountFeedback: feedback.appearancesCount.feedback,
+            popularity: guessData.popularity,
+            popularityFeedback: feedback.popularity.feedback,
+            sharedAppearances: feedback.shared_appearances,
+            metaTags: guessData.metaTags,
+            sharedMetaTags: feedback.metaTags.shared,
+            isAnswer: false
+          };
+        }
+      })();
+
       socket.emit('playerGuess', {
         roomId,
+        guessData: currentGuess,
         guessResult: {
           isCorrect,
           icon: guessData.image,
@@ -262,83 +358,6 @@ const Multiplayer = () => {
           nameCn: guessData.nameCn
         }
       });
-
-      if (isCorrect) {
-        setGuesses(prevGuesses => [...prevGuesses, {
-          icon: guessData.image,
-          name: guessData.name,
-          nameCn: guessData.nameCn,
-          gender: guessData.gender,
-          genderFeedback: 'yes',
-          latestAppearance: guessData.latestAppearance,
-          latestAppearanceFeedback: '=',
-          earliestAppearance: guessData.earliestAppearance,
-          earliestAppearanceFeedback: '=',
-          highestRating: guessData.highestRating,
-          ratingFeedback: '=',
-          appearancesCount: guessData.appearances.length,
-          appearancesCountFeedback: '=',
-          popularity: guessData.popularity,
-          popularityFeedback: '=',
-          sharedAppearances: {
-            first: appearances.appearances[0] || '',
-            count: appearances.appearances.length
-          },
-          metaTags: guessData.metaTags,
-          sharedMetaTags: guessData.metaTags,
-          isAnswer: true
-        }]);
-
-        handleGameEnd(true);
-      } else if (guessesLeft <= 1) {
-        const feedback = generateFeedback(guessData, answerCharacter);
-        setGuesses(prevGuesses => [...prevGuesses, {
-          icon: guessData.image,
-          name: guessData.name,
-          nameCn: guessData.nameCn,
-          gender: guessData.gender,
-          genderFeedback: feedback.gender.feedback,
-          latestAppearance: guessData.latestAppearance,
-          latestAppearanceFeedback: feedback.latestAppearance.feedback,
-          earliestAppearance: guessData.earliestAppearance,
-          earliestAppearanceFeedback: feedback.earliestAppearance.feedback,
-          highestRating: guessData.highestRating,
-          ratingFeedback: feedback.rating.feedback,
-          appearancesCount: guessData.appearances.length,
-          appearancesCountFeedback: feedback.appearancesCount.feedback,
-          popularity: guessData.popularity,
-          popularityFeedback: feedback.popularity.feedback,
-          sharedAppearances: feedback.shared_appearances,
-          metaTags: guessData.metaTags,
-          sharedMetaTags: feedback.metaTags.shared,
-          isAnswer: false
-        }]);
-
-        handleGameEnd(false);
-      } else {
-        const feedback = generateFeedback(guessData, answerCharacter);
-        setGuesses(prevGuesses => [...prevGuesses, {
-          icon: guessData.image,
-          name: guessData.name,
-          nameCn: guessData.nameCn,
-          gender: guessData.gender,
-          genderFeedback: feedback.gender.feedback,
-          latestAppearance: guessData.latestAppearance,
-          latestAppearanceFeedback: feedback.latestAppearance.feedback,
-          earliestAppearance: guessData.earliestAppearance,
-          earliestAppearanceFeedback: feedback.earliestAppearance.feedback,
-          highestRating: guessData.highestRating,
-          ratingFeedback: feedback.rating.feedback,
-          appearancesCount: guessData.appearances.length,
-          appearancesCountFeedback: feedback.appearancesCount.feedback,
-          popularity: guessData.popularity,
-          popularityFeedback: feedback.popularity.feedback,
-          sharedAppearances: feedback.shared_appearances,
-          metaTags: guessData.metaTags,
-          sharedMetaTags: feedback.metaTags.shared,
-          isAnswer: false
-        }]);
-      }
     } catch (error) {
       console.error('Error processing guess:', error);
       alert('出错了，请重试');

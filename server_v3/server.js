@@ -12,12 +12,12 @@ const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
 const SERVER_URL = process.env.SERVER_URL || 'http://localhost:3000';
 
 const cors_options = {
-    origin: [
-        CLIENT_URL,
-        SERVER_URL
-    ],
-      methods: ['GET', 'POST'],
-      credentials: true
+  origin: [
+    CLIENT_URL,
+    SERVER_URL
+  ],
+  methods: ['GET', 'POST'],
+  credentials: true
 }
 
 const io = new Server(server, {
@@ -42,13 +42,13 @@ io.on('connection', (socket) => {
     }
 
     if (rooms.has(roomId)) {
-        socket.emit('error', { message: '房间已存在？但为什么？' });
-        return;
+      socket.emit('error', { message: '房间已存在？但为什么？' });
+      return;
     }
 
     if (rooms.size >= 300) {
-        socket.emit('error', { message: '服务器已满，请稍后再试' });
-        return;
+      socket.emit('error', { message: '服务器已满，请稍后再试' });
+      return;
     }
 
     rooms.set(roomId, {
@@ -80,8 +80,8 @@ io.on('connection', (socket) => {
   socket.on('joinRoom', ({ roomId, username }) => {
     // Basic validation
     if (!username || username.trim().length === 0) {
-        socket.emit('error', { message: '用户名呢' });
-        return;
+      socket.emit('error', { message: '用户名呢' });
+      return;
     }
 
     const room = rooms.get(roomId);
@@ -255,7 +255,7 @@ io.on('connection', (socket) => {
   });
 
   // Handle player guesses
-  socket.on('playerGuess', ({ roomId, guessResult }) => {
+  socket.on('playerGuess', ({ roomId, guessResult, guessData }) => {
     const room = rooms.get(roomId);
 
     if (!room) {
@@ -271,16 +271,29 @@ io.on('connection', (socket) => {
 
     // Store guess in the player's guesses array using their username
     if (room.currentGame) {
-      const playerGuesses = room.currentGame.guesses.find(g => g.username === player.username);
-      if (playerGuesses) {
-        playerGuesses.guesses.push({
-          playerId: socket.id,
-          playerName: player.username,
-          ...guessResult,
-          timestamp: Date.now()
-        });
-      }
+      // const playerGuesses = room.currentGame.guesses.find(g => g.username === player.username);
+      // if (playerGuesses) {
+      //   playerGuesses.guesses.push({
+      //     playerId: socket.id,
+      //     playerName: player.username,
+      //     ...guessResult,
+      //     timestamp: Date.now()
+      //   });
+      // }
+      room.currentGame.guesses.push({
+        playerId: socket.id,
+        playerName: player.username,
+        ...guessResult,
+        timestamp: Date.now()
+      });
     }
+
+    console.log(`Player ${player.username} guessed in room ${roomId}: ${guessResult.name} (${guessResult.isCorrect ? 'correct' : 'incorrect'})`);
+    console.log(`Guess data: ${JSON.stringify(guessData)}`);
+
+    io.to(roomId).emit('updateGuess', {
+      guessData
+    });
 
     // Update player's guesses string
     player.guesses += guessResult.isCorrect ? '✔' : '❌';
