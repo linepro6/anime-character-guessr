@@ -10,7 +10,7 @@ import {
 import SettingsPopup from '../components/SettingsPopup';
 import SearchBar from '../components/SearchBar';
 import GuessesTable from '../components/GuessesTable';
-import Timer from '../components/Timer';
+import MultipleTimer from '../components/MultipleTimer';
 import PlayerList from '../components/PlayerList';
 import GameEndPopup from '../components/GameEndPopup';
 import '../styles/Multiplayer.css';
@@ -67,7 +67,6 @@ const Multiplayer = () => {
     first: null,
     second: null
   });
-  const [shouldResetTimer, setShouldResetTimer] = useState(false);
   const [gameEnd, setGameEnd] = useState(false);
   const timeUpRef = useRef(false);
   const gameEndedRef = useRef(false);
@@ -75,35 +74,29 @@ const Multiplayer = () => {
   const [globalGameEnd, setGlobalGameEnd] = useState(false);
   const [guessesHistory, setGuessesHistory] = useState([]);
   const [showNames, setShowNames] = useState(true);
-  const [currentSubjectSearch, setCurrentSubjectSearch] = useState(true);
   const [showCharacterPopup, setShowCharacterPopup] = useState(false);
 
-  const handleUpdateGuess = useCallback(
-    (guessData) => {
-      const isCorrect = guessData.id === answerCharacter.id;
+  const timerRef = useRef(null);
 
-      setGuessesLeft((prev) => prev - 1);
+  const handleUpdateGuessRef = useRef();
+  handleUpdateGuessRef.current = (guessData) => {
+    timerRef.current.reset();
+    const isCorrect = guessData.id === answerCharacter.id;
 
-      if (isCorrect) {
-        setGuesses((prevGuesses) => [...prevGuesses, guessData]);
+    setGuessesLeft((prev) => prev - 1);
 
-        handleGameEnd(true);
-      } else if (guessesLeft <= 1) {
-        setGuesses((prevGuesses) => [...prevGuesses, guessData]);
+    if (isCorrect) {
+      setGuesses((prevGuesses) => [...prevGuesses, guessData]);
 
-        handleGameEnd(false);
-      } else {
-        setGuesses((prevGuesses) => [...prevGuesses, guessData]);
-      }
+      handleGameEnd(true);
+    } else if (guessesLeft <= 1) {
+      setGuesses((prevGuesses) => [...prevGuesses, guessData]);
 
-      setIsGuessing(false);
-      setShouldResetTimer(false);
-    },
-    [answerCharacter]
-  );
-
-  const handleUpdateGuessRef = useRef(handleUpdateGuess);
-  handleUpdateGuessRef.current = handleUpdateGuess;
+      handleGameEnd(false);
+    } else {
+      setGuesses((prevGuesses) => [...prevGuesses, guessData]);
+    }
+  };
 
   useEffect(() => {
     // Initialize socket connection
@@ -143,7 +136,6 @@ const Multiplayer = () => {
       setAnswerCharacter(decryptedCharacter);
       setGameSettings(settings);
       setGuessesLeft(settings.maxAttempts);
-      setCurrentSubjectSearch(settings.subjectSearch);
       if (players) {
         setPlayers(players);
       }
@@ -171,6 +163,7 @@ const Multiplayer = () => {
       setIsGameStarted(true);
       setGameEnd(false);
       setGuesses([]);
+      timerRef.current.reset();
     });
 
     // Listen for game end event
@@ -192,9 +185,6 @@ const Multiplayer = () => {
     newSocket.on('updateGuess', ({ guessData }) => {
 
       console.log('Received guess update:', guessData);
-
-      setIsGuessing(true);
-      setShouldResetTimer(true);
 
       handleUpdateGuessRef.current(guessData);
     });
@@ -411,9 +401,7 @@ const Multiplayer = () => {
       }, 100);
     }
 
-    setShouldResetTimer(true);
     setTimeout(() => {
-      setShouldResetTimer(false);
       timeUpRef.current = false;
     }, 100);
   };
@@ -445,7 +433,6 @@ const Multiplayer = () => {
         // Update local state
         setAnswerCharacter(character);
         setGuessesLeft(gameSettings.maxAttempts);
-        setCurrentSubjectSearch(gameSettings.subjectSearch);
 
         // Prepare hints if enabled
         let hintTexts = ['🚫提示未启用', '🚫提示未启用'];
@@ -593,11 +580,10 @@ const Multiplayer = () => {
                 subjectSearch={gameSettings.subjectSearch}
               />
               {gameSettings.timeLimit && !gameEnd && (
-                <Timer
+                <MultipleTimer
                   timeLimit={gameSettings.timeLimit}
                   onTimeUp={handleTimeUp}
-                  isActive={!isGuessing}
-                  reset={shouldResetTimer}
+                  ref={timerRef}
                 />
               )}
               <div className="game-info">
