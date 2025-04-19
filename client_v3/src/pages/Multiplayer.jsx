@@ -258,7 +258,7 @@ const Multiplayer = () => {
     // });
 
     setGlobalGameEnd(true);
-    // setGuessesHistory(guesses);
+    setGuessesHistory(guesses);
     setIsGameStarted(false);
 
     // Update player score
