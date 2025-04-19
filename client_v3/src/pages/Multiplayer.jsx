@@ -1,8 +1,12 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
 import { io } from 'socket.io-client';
-import { getRandomCharacter, getCharacterAppearances, generateFeedback } from '../utils/anime';
+import {
+  getRandomCharacter,
+  getCharacterAppearances,
+  generateFeedback,
+} from '../utils/anime';
 import SettingsPopup from '../components/SettingsPopup';
 import SearchBar from '../components/SearchBar';
 import GuessesTable from '../components/GuessesTable';
@@ -29,26 +33,29 @@ const Multiplayer = () => {
   const [error, setError] = useState('');
   const [showSettings, setShowSettings] = useState(false);
   const [isPublic, setIsPublic] = useState(true);
-  const [gameSettings, setGameSettings, removeGameSettings] = useLocalStorage('multiplayer-game-settings', {
-    startYear: new Date().getFullYear()-5,
-    endYear: new Date().getFullYear(),
-    topNSubjects: 20,
-    useSubjectPerYear: false,
-    metaTags: ["", "", ""],
-    useIndex: false,
-    indexId: null,
-    addedSubjects: [],
-    mainCharacterOnly: true,
-    characterNum: 6,
-    maxAttempts: 10,
-    enableHints: false,
-    includeGame: false,
-    timeLimit: 60,
-    subjectSearch: true,
-    characterTagNum: 6,
-    subjectTagNum: 8,
-    enableTagCensor: false
-  });
+  const [gameSettings, setGameSettings, removeGameSettings] = useLocalStorage(
+    'multiplayer-game-settings',
+    {
+      startYear: new Date().getFullYear() - 5,
+      endYear: new Date().getFullYear(),
+      topNSubjects: 20,
+      useSubjectPerYear: false,
+      metaTags: ['', '', ''],
+      useIndex: false,
+      indexId: null,
+      addedSubjects: [],
+      mainCharacterOnly: true,
+      characterNum: 6,
+      maxAttempts: 10,
+      enableHints: false,
+      includeGame: false,
+      timeLimit: 60,
+      subjectSearch: true,
+      characterTagNum: 6,
+      subjectTagNum: 8,
+      enableTagCensor: false,
+    }
+  );
 
   // Game state
   const [isGameStarted, setIsGameStarted] = useState(false);
@@ -71,12 +78,37 @@ const Multiplayer = () => {
   const [currentSubjectSearch, setCurrentSubjectSearch] = useState(true);
   const [showCharacterPopup, setShowCharacterPopup] = useState(false);
 
+  const handleUpdateGuess = useCallback(
+    (guessData) => {
+      const isCorrect = guessData.id === answerCharacter.id;
+
+      setGuessesLeft((prev) => prev - 1);
+
+      if (isCorrect) {
+        setGuesses((prevGuesses) => [...prevGuesses, guessData]);
+
+        handleGameEnd(true);
+      } else if (guessesLeft <= 1) {
+        setGuesses((prevGuesses) => [...prevGuesses, guessData]);
+
+        handleGameEnd(false);
+      } else {
+        setGuesses((prevGuesses) => [...prevGuesses, guessData]);
+      }
+
+      setIsGuessing(false);
+      setShouldResetTimer(false);
+    },
+    [answerCharacter]
+  );
+
+  const handleUpdateGuessRef = useRef(handleUpdateGuess);
+  handleUpdateGuessRef.current = handleUpdateGuess;
+
   useEffect(() => {
     // Initialize socket connection
     const newSocket = io(SOCKET_URL);
     setSocket(newSocket);
-
-    let internalAnswerCharacter = null;
 
     // Socket event listeners
     newSocket.on('updatePlayers', ({ players, isPublic }) => {
@@ -106,8 +138,6 @@ const Multiplayer = () => {
     newSocket.on('gameStart', ({ character, settings, players, isPublic }) => {
       gameEndedRef.current = false;
       const decryptedCharacter = JSON.parse(CryptoJS.AES.decrypt(character, secret).toString(CryptoJS.enc.Utf8));
-
-      internalAnswerCharacter = decryptedCharacter;
 
       console.log('Game started with character:', decryptedCharacter);
       setAnswerCharacter(decryptedCharacter);
@@ -166,25 +196,7 @@ const Multiplayer = () => {
       setIsGuessing(true);
       setShouldResetTimer(true);
 
-  
-      const isCorrect = guessData.id === internalAnswerCharacter.id;
-  
-      setGuessesLeft(prev => prev - 1);
-  
-      if (isCorrect) {
-        setGuesses(prevGuesses => [...prevGuesses, guessData]);
-  
-        handleGameEnd(true);
-      } else if (guessesLeft <= 1) {
-        setGuesses(prevGuesses => [...prevGuesses, guessData]);
-  
-        handleGameEnd(false);
-      } else {
-        setGuesses(prevGuesses => [...prevGuesses, guessData]);
-      }
-
-      setIsGuessing(false);
-      setShouldResetTimer(false);
+      handleUpdateGuessRef.current(guessData);
     });
 
     return () => {
